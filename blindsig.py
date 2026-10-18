@@ -1,10 +1,10 @@
 """Chaum FDH-RSA blind signatures — the search gate's membership proof.
 
-The property Matt asked for (2026-08-24): the service knows a request comes
-from SOMEONE with a Handshake identity, and cannot know WHICH one — even
-with full logs of both servers. Blind signatures give that by math:
+The property: the gate knows a request comes from SOMEONE with a Handshake
+identity, and cannot know WHICH one, even with full logs of both servers.
+Blind signatures give that by math:
 
-    issuance (tenant plane, knows the name):
+    issuance (issuer, knows the name):
         client:  nonce ← random 32B;  m = FDH(nonce)
                  r ← random;  b = m · r^e  mod n          (blinded)
         server:  s_b = b^d mod n                          (signs blind)
@@ -19,11 +19,9 @@ textbook RSA blinding sound: hashing onto the full modulus destroys the
 multiplicative structure behind forgery tricks (Chaum's construction as
 analysed by Bellare-Rogaway).
 
-Deployed twice from this one source (drift pinned by shared test vectors):
-  - web/core/blindsig.py       — the tenant plane SIGNS (holds d)
-  - RackNerd /opt/searchgate/  — the gate VERIFIES (holds only n, e)
-The blind/unblind client half lives here for tests and as the reference for
-the browser's BigInt implementation.
+The issuer SIGNS (holds d); the gate only VERIFIES (holds n, e). The
+blind/unblind client half is here for the tests and as the reference for
+client implementations.
 """
 import hashlib
 import json
@@ -35,8 +33,7 @@ def fdh(nonce: bytes, n: int) -> int:
     """Full-domain hash of `nonce` onto Z_n.
 
     SHA-256 counter expansion to the modulus byte-length, reduced mod n.
-    Deterministic; both sides and the browser must match bit-for-bit —
-    pinned by the cross-implementation vectors in the tests.
+    Deterministic; every implementation must match it bit for bit.
     """
     nbytes = (n.bit_length() + 7) // 8
     out = b""
@@ -110,17 +107,15 @@ def load_key(path: str) -> dict:
         return {k: int(v) for k, v in json.load(fh).items()}
 
 
-# ------------------------------------------------------------- wire format
-
 # ------------------------------------------------------------------- epochs
 #
-# The "keep no records" fix (NO-RECORDS.md): the gate's spent-set moves to RAM,
-# which is only safe because tokens are scoped to an ISSUER-KEY EPOCH. Each key
-# has a short id and a validity window; the issuer signs with the current key,
-# the gate verifies against the key the token names, and when a key rotates out
-# its whole spent-bucket is dropped — rotation IS garbage collection, and a gate
-# restart can never enable double-spend beyond the current epoch. This is the
-# Privacy Pass key_id/rotation model (RFC 9576 §7.1, RFC 9578 §4) applied to our
+# Keeping no records: the gate's spent-set lives in RAM, which is only safe
+# because tokens are scoped to an ISSUER-KEY EPOCH. Each key has a short id and
+# a validity window; the issuer signs with the current key, the gate verifies
+# against the key the token names, and when a key rotates out its whole
+# spent-bucket is dropped — rotation IS garbage collection, and a gate restart
+# can never enable double-spend beyond the current epoch. This is the Privacy
+# Pass key_id/rotation model (RFC 9576 §7.1, RFC 9578 §4) applied to our
 # self-contained gate.
 
 def key_id(pub: dict) -> str:

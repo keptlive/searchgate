@@ -1,30 +1,30 @@
 #!/usr/bin/env python3
 """The search gate: membership in, identity never — and NO records kept.
 
-Sits between Caddy (hsearch.hns.one, TLS) and the curated SearXNG on
-loopback. Every /search request must carry one blind-signature token
-(Authorization: Bearer <key_id>.<nonce>.<sig>) minted by the tenant plane
-against a claimed Handshake name. The gate verifies the issuer signature and
+Sits between a TLS proxy and a SearXNG instance on loopback. Every /search
+request must carry one blind-signature token
+(Authorization: Bearer <key_id>.<nonce>.<sig>) minted by a separate issuer
+for holders of a Handshake name. The gate verifies the issuer signature and
 burns the token so it learns exactly one bit about the caller: "holds an
 identity". Which identity is unknowable here BY CONSTRUCTION (blindsig.py).
 
-KEEPS NO RECORDS (NO-RECORDS.md). The double-spend set lives in RAM ONLY,
-keyed on the token's random nonce (never on identity), partitioned by issuer
-KEY EPOCH. A token verifies only while its key's window is open; when the
-tenant rotates a key out of the public keyset, the gate DROPS that key's whole
-spent-bucket — rotation is garbage collection. So a restart/seizure forgets
-everything, and can never enable double-spend beyond the current epoch. There
-is no disk state to hand over.
+KEEPS NO RECORDS. The double-spend set lives in RAM ONLY, keyed on the token's
+random nonce (never on identity), partitioned by issuer KEY EPOCH. A token
+verifies only while its key's window is open; when the issuer rotates a key out
+of the public keyset, the gate DROPS that key's whole spent-bucket — rotation
+is garbage collection. So a restart/seizure forgets everything, and can never
+enable double-spend beyond the current epoch. There is no disk state to hand
+over.
 
 WHAT THIS PROCESS DELIBERATELY DOES NOT DO:
   - log queries (errors only, and error lines carry no query text)
   - write ANY request state to disk (the spent-set is RAM; the only file it
-    reads is the public keyset the tenant pushes)
+    reads is the public keyset the issuer publishes)
   - forward any client-identifying header upstream
   - serve anything without a valid, unspent, in-window token (except
     /healthz and /keys, which are public and carry nothing private)
 
-    SEARCHGATE_KEYSET=/opt/searchgate/search-keyset-public.json \
+    SEARCHGATE_KEYSET=/path/to/search-keyset-public.json \
     python3 gate.py --port 8880 --upstream http://127.0.0.1:8888
 """
 import argparse
@@ -39,7 +39,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import blindsig
 
-KEYSET_FILE = "/opt/searchgate/search-keyset-public.json"
+KEYSET_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "search-keyset-public.json")
 UPSTREAM = "http://127.0.0.1:8888"
 
 
@@ -189,7 +190,7 @@ def main():
     KEYS = KeySet(args.keyset)
     if not KEYS.public():
         print(f"WARNING: no valid keys in {args.keyset} — every request will "
-              f"401 until the tenant pushes a keyset", file=sys.stderr)
+              f"401 until the issuer publishes a keyset", file=sys.stderr)
     print(f"searchgate on {args.host}:{args.port} -> {UPSTREAM} "
           f"(spent-set in RAM, epoch-scoped; queries unlogged)")
     ThreadingHTTPServer((args.host, args.port), Handler).serve_forever()

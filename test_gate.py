@@ -1,4 +1,4 @@
-"""The search gate's privacy + correctness properties (NO-RECORDS.md).
+"""The search gate's privacy and correctness properties.
 
 Pins the epoch model that makes a RAM-only spent-set safe: a token verifies
 only in its key's window, a spent nonce is refused, rotating a key out drops

@@ -1,5 +1,5 @@
 __pycache__/
 *.pyc
 *.log
-# private key material lives in ~/.hns-creds, never here
+# the private keyset (keyrotate.py, SEARCH_KEYSET) is never committed
 search-keyset.json

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Issuer-key epochs for the search gate — the thing that makes a RAM-only
-spent-set safe (NO-RECORDS.md).
+spent-set safe.
 
     python3 keyrotate.py init                 # first keyset, one live key
     python3 keyrotate.py rotate               # mint a new epoch, retire the old
@@ -15,10 +15,10 @@ spent-bucket. So the worst a restart can do is let tokens minted in the
 CURRENT epoch be re-spent — bounded by the epoch length, never the whole
 history. Rotation is garbage collection.
 
-THE PRIVATE KEYSET stays on the issuer (tenant plane): it holds d and can
-sign. THE PUBLIC VIEW (id + n,e + window, no d) is what the gate gets — it can
-verify and see expiry, never sign. This tool writes the private set locally
-and, with --push, scp's only the public view to the gate.
+THE PRIVATE KEYSET stays on the issuer: it holds d and can sign. THE PUBLIC
+VIEW (id + n,e + window, no d) is what the gate gets — it can verify and see
+expiry, never sign. This tool writes the private set locally and, with --push,
+scp's only the public view to the gate.
 
 TUNING (RFC 9576 §6.2 tension): a shorter epoch means a smaller RAM spent-set
 and a tighter restart-window, but a SMALLER anonymity cohort — every token
@@ -36,7 +36,7 @@ import blindsig
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PRIV = os.environ.get("SEARCH_KEYSET",
-                      os.path.expanduser("~/.hns-creds/search-keyset.json"))
+                      os.path.expanduser("~/.config/searchgate/search-keyset.json"))
 PUB_OUT = os.path.join(HERE, "search-keyset-public.json")
 
 EPOCH = int(os.environ.get("SEARCH_EPOCH_SECONDS", 24 * 3600))
@@ -47,7 +47,8 @@ OVERLAP = int(os.environ.get("SEARCH_OVERLAP_SECONDS", 3600))
 EDGE_SSH = os.environ.get("HNS_EDGE_SSH_SEARCH", "root@YOUR_SEARCH_HOST")
 EDGE_KEY = os.path.expanduser(os.environ.get("HNS_EDGE_KEY_SEARCH",
                                              "~/.ssh/your_search_host_key"))
-EDGE_PUB = "/opt/searchgate/search-keyset-public.json"
+EDGE_PUB = os.environ.get("HNS_EDGE_PATH_SEARCH",
+                          "/srv/searchgate/search-keyset-public.json")
 
 
 def load():
@@ -143,7 +144,7 @@ def cmd_show(a):
 def cmd_run(a):
     """Daemon: rotate whenever the newest key nears expiry. Robust to restarts
     (it checks remaining life, never sleeps a fixed 24h) — a missed cycle can't
-    silently expire the live key and 401 every search. Runs from up.sh."""
+    silently expire the live key and 401 every search."""
     while True:
         now = int(time.time())
         keyset = load()
