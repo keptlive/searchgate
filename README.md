@@ -37,6 +37,12 @@ The gate rereads the keyset file when it changes. Spent tokens are held in
 memory only, in one set per key, and a key's set is dropped when the key leaves
 the keyset. Requests are not logged.
 
+**Restart boundary:** a previously spent token can be redeemed again after a
+restart while its signing key is still valid. Separate gate processes also
+have independent spent sets. This implementation deliberately avoids durable
+request state; it does not provide restart-safe or multi-process single use.
+Do not use it for that requirement without designing a shared redemption store.
+
 ## Keys
 
     python3 keyrotate.py init      # create the first key
